@@ -1,6 +1,6 @@
 from pydantic_settings import BaseSettings
+from pydantic import ConfigDict
 from typing import List
-import os
 
 
 class Settings(BaseSettings):
@@ -9,8 +9,9 @@ class Settings(BaseSettings):
     DEBUG: bool = True
 
     # MongoDB
-    MONGO_URI: str = "mongodb://localhost:27017"
+    MONGO_URI: str = "mongodb+srv://aniketbedwal90_db_user:aniketbedwal90_db_user@cluster0.jw3kv6t.mongodb.net/skillgap_v3?retryWrites=true&w=majority"
     MONGO_DB_NAME: str = "skillgap_v3"
+    PORT: int = 8000
 
     # AI APIs
     GROQ_API_KEY: str = ""
@@ -19,7 +20,7 @@ class Settings(BaseSettings):
     # Auth
     JWT_SECRET: str = "change-me-in-production"
     JWT_ALGORITHM: str = "HS256"
-    JWT_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
+    JWT_EXPIRE_MINUTES: int = 60 * 24 * 7
 
     # CORS
     ALLOWED_ORIGINS: List[str] = [
@@ -35,9 +36,11 @@ class Settings(BaseSettings):
     AI_TIMEOUT_SECONDS: int = 30
     AI_MAX_RETRIES: int = 2
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    model_config = ConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore"
+    )
 
 
 settings = Settings()
