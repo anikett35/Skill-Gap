@@ -1,11 +1,10 @@
 """
-app/ml/pipeline.py — Fixed version without spaCy
-Uses pure sentence-transformers for embeddings only
+ML Pipeline - Fixed for Render (no spaCy dependency)
+Uses sentence-transformers for embeddings only
 """
 from __future__ import annotations
 import logging
 from functools import lru_cache
-from typing import Optional
 import numpy as np
 
 logger = logging.getLogger(__name__)
@@ -39,7 +38,7 @@ def compute_embedding_similarity(resume_text: str, jd_text: str) -> float:
             similarity = float(np.dot(embeddings[0], embeddings[1]))
             return round(max(0.0, min(1.0, similarity)), 3)
         except Exception as e:
-            logger.warning(f"Embedding failed: {e}")
+            logger.warning(f"Embedding failed, using Jaccard: {e}")
 
     # Fallback: Jaccard similarity
     set_a = set(resume_text.lower().split())
@@ -47,3 +46,13 @@ def compute_embedding_similarity(resume_text: str, jd_text: str) -> float:
     if not set_a or not set_b:
         return 0.0
     return round(len(set_a & set_b) / len(set_a | set_b), 3)
+
+
+def embed_skill_list(skills: list) -> None:
+    """Stub - embeddings handled by similarity function."""
+    return None
+
+
+def skill_similarity_matrix(resume_skills: list, jd_skills: list) -> dict:
+    """Stub - not needed without spaCy pipeline."""
+    return {}
