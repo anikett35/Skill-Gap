@@ -1,105 +1,44 @@
-"""
-Analysis Service — 100% local, NO external API calls, NO timeouts
-"""
-from __future__ import annotations
-import logging
+from fastapi import APIRouter, Depends, HTTPException
 from datetime import datetime
-from app.ml.extractor import extract_resume_context, extract_job_context
-from app.ml.adaptive import analyze_gaps, generate_roadmap, generate_reasoning_trace
-from app.ml.pipeline import compute_embedding_similarity
+from bson import ObjectId
+from app.schemas.schemas import AnalyzeRequest
+from app.services.analysis import run_full_analysis
+from app.core.security import get_current_user
+from app.db.mongodb import analyses_col
 
-logger = logging.getLogger(__name__)
+router = APIRouter()
 
-
-async def run_full_analysis(resume_text: str, jd_text: str) -> dict:
-    """
-    Full local pipeline — zero external API calls, no timeout risk.
-    All processing done locally using ML models only.
-    """
-    logger.info("Step 1: Extracting resume skills")
-    resume_ctx = extract_resume_context(resume_text)
-    candidate_skills = resume_ctx["skills"]
-
-    logger.info("Step 2: Parsing job description")
-    jd_ctx = extract_job_context(jd_text)
-    required_skills = jd_ctx["required_skills"]
-    job_title = jd_ctx["job_title"]
-
-    logger.info(f"Found {len(candidate_skills)} resume skills, {len(required_skills)} JD requirements")
-
-    logger.info("Step 3: Embedding similarity")
+@router.post("")
+async def analyze(body: AnalyzeRequest, current_user: dict = Depends(get_current_user)):
     try:
-        overall_similarity = compute_embedding_similarity(resume_text, jd_text)
+        result = await run_full_analysis(body.resume_text, body.jd_text)
     except Exception as e:
-        logger.warning(f"Embedding failed: {e}, using 0.5 default")
-        overall_similarity = 0.5
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+    doc = {"user_id": current_user["user_id"], "resume_text": body.resume_text[:5000],
+           "jd_text": body.jd_text[:3000], "result": result, "created_at": datetime.utcnow()}
+    inserted = await analyses_col().insert_one(doc)
+    result["id"] = str(inserted.inserted_id)
+    return result
 
-    logger.info("Step 4: Gap scoring + knowledge tracing + topological sort")
-    gap_analysis = analyze_gaps(candidate_skills, required_skills)
-    gaps = gap_analysis["skill_gaps"]
-    learner_level = gap_analysis["learner_level"]
+@router.get("/history")
+async def get_history(current_user: dict = Depends(get_current_user)):
+    cursor = analyses_col().find({"user_id": current_user["user_id"]},
+        {"result.candidate_name": 1, "result.job_title": 1, "result.resume_score": 1, "created_at": 1}
+    ).sort("created_at", -1).limit(20)
+    history = []
+    async for doc in cursor:
+        doc["id"] = str(doc.pop("_id"))
+        history.append(doc)
+    return history
 
-    logger.info("Step 5: Generating roadmap from local catalog")
-    roadmap = generate_roadmap(gaps, learner_level, job_title)
-
-    logger.info("Step 6: Generating reasoning trace")
+@router.get("/{analysis_id}")
+async def get_analysis(analysis_id: str, current_user: dict = Depends(get_current_user)):
     try:
-        reasoning_trace = generate_reasoning_trace(
-            candidate_skills=candidate_skills,
-            required_skills=required_skills,
-            gaps=gaps,
-            resume_score=gap_analysis["resume_score"],
-            learner_level=learner_level,
-            job_title=job_title,
-        )
-    except Exception as e:
-        logger.warning(f"Reasoning trace failed: {e}")
-        reasoning_trace = {"verdict": "Analysis complete", "steps": []}
-
-    ai_summary = _generate_summary(
-        gap_analysis["resume_score"]["score"],
-        gaps[:3],
-        learner_level,
-        job_title,
-    )
-
-    return {
-        "candidate_name": resume_ctx.get("candidate_name", "Candidate"),
-        "job_title": job_title,
-        "learner_level": learner_level,
-        "overall_similarity": overall_similarity,
-        "resume_score": gap_analysis["resume_score"],
-        "overall_gap_score": gap_analysis["overall_gap_score"],
-        "skills_met": gap_analysis["skills_met"],
-        "skills_total": gap_analysis["skills_total"],
-        "candidate_skills": candidate_skills,
-        "required_skills": required_skills,
-        "skill_gaps": gaps,
-        "time_estimate": gap_analysis["time_estimate"],
-        "learning_roadmap": roadmap,
-        "reasoning_trace": reasoning_trace,
-        "ai_summary": ai_summary,
-        "created_at": datetime.utcnow().isoformat(),
-        "pipeline_info": {
-            "extraction": "TF-IDF + O*NET 27.3 taxonomy",
-            "similarity": "sentence-transformers/all-MiniLM-L6-v2",
-            "pathing": "Kahn's topological sort + knowledge tracing",
-            "catalog": "Curated — 100% verified URLs, zero hallucinations",
-            "api_calls": 0,
-        },
-    }
-
-
-def _generate_summary(score, top_gaps, learner_level, job_title):
-    names = [g["skill"] for g in top_gaps]
-    if score >= 75:
-        s, a = "strong", "focus on a few key areas to reach full competency"
-    elif score >= 50:
-        s, a = "moderate", "bridge specific skill gaps with targeted learning"
-    else:
-        s, a = "foundational", "build core skills systematically from prerequisites up"
-    out = (f"Your resume shows a {s} match ({score:.0f}/100) for {job_title}. "
-           f"As a {learner_level}-level candidate, you should {a}. ")
-    if names:
-        out += f"Priority areas: {', '.join(names[:3])}."
-    return out
+        oid = ObjectId(analysis_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid analysis ID")
+    doc = await analyses_col().find_one({"_id": oid, "user_id": current_user["user_id"]})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    doc["id"] = str(doc.pop("_id"))
+    return doc["result"]

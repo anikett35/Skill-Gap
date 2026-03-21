@@ -3,16 +3,13 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
-import time
-import logging
-
+import time, logging
 from app.core.config import settings
 from app.core.logging import setup_logging
 from app.db.mongodb import connect_to_mongo, close_mongo_connection
 
 setup_logging()
 logger = logging.getLogger(__name__)
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -22,22 +19,10 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down...")
     await close_mongo_connection()
 
-
-app = FastAPI(
-    title="AI Adaptive Onboarding Engine v3",
-    version="3.0.0",
-    lifespan=lifespan,
-    docs_url="/docs",
-)
-
+app = FastAPI(title="AI Adaptive Onboarding Engine v3", version="3.0.0", lifespan=lifespan, docs_url="/docs")
 app.add_middleware(GZipMiddleware, minimum_size=1000)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app.add_middleware(CORSMiddleware, allow_origins=settings.ALLOWED_ORIGINS,
+    allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 @app.middleware("http")
 async def add_process_time(request: Request, call_next):
@@ -51,9 +36,7 @@ async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"Unhandled error on {request.url}: {exc}", exc_info=True)
     return JSONResponse(status_code=500, content={"detail": str(exc)})
 
-# Import routers
 from app.api import auth, analyze, progress, chat, export
-
 app.include_router(auth.router,     prefix="/api/auth",     tags=["Auth"])
 app.include_router(analyze.router,  prefix="/api/analyze",  tags=["Analysis"])
 app.include_router(progress.router, prefix="/api/progress", tags=["Progress"])
