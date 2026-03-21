@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     # CORS
     ALLOWED_ORIGINS: List[str] = [
         "http://localhost:3000",
-        "https://your-app.vercel.app",
+        "https://skill-gap-seven.vercel.app",
     ]
 
     # ML Models
