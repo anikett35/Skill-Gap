@@ -15,14 +15,26 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     logger.info("Starting up — connecting to MongoDB...")
     await connect_to_mongo()
+    logger.info(f"✅ CORS configured for: {settings.ALLOWED_ORIGINS}")
     yield
     logger.info("Shutting down...")
     await close_mongo_connection()
 
 app = FastAPI(title="AI Adaptive Onboarding Engine v3", version="3.0.0", lifespan=lifespan, docs_url="/docs")
+
+# CORS must be added BEFORE other middleware
+# Use ["*"] in development, explicit origins in production
+cors_origins = settings.ALLOWED_ORIGINS if settings.ALLOWED_ORIGINS else ["*"]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=600,
+)
 app.add_middleware(GZipMiddleware, minimum_size=1000)
-app.add_middleware(CORSMiddleware, allow_origins=settings.ALLOWED_ORIGINS,
-    allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 @app.middleware("http")
 async def add_process_time(request: Request, call_next):
