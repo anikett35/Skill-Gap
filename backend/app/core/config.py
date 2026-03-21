@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     NER_MODEL: str = "en_core_web_sm"
 
     # AI Reliability
-    AI_TIMEOUT_SECONDS: int = 30
+    AI_TIMEOUT_SECONDS: int = 120  # Increased for roadmap generation
     AI_MAX_RETRIES: int = 2
 
     model_config = ConfigDict(

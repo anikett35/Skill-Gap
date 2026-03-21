@@ -4,7 +4,7 @@ const API_URL = import.meta.env.REACT_APP_API_URL || "http://localhost:8000/api"
 
 export const api = axios.create({
   baseURL: API_URL,
-  timeout: 60000,
+  timeout: 120000, // 2 minutes for long-running analysis
 });
 
 // Attach JWT to every request
