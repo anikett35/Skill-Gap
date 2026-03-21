@@ -15,14 +15,10 @@ bcrypt>=4.1.3
 # HTTP
 httpx>=0.27.0
 
-# ML — core (NO external API needed)
-spacy>=3.8.0
+# ML — NO spaCy (Python 3.14 incompatible), using pure regex extractor instead
 sentence-transformers>=3.0.1
 scikit-learn>=1.5.0
 numpy>=1.26.0
-
-# Optional: PDF export (comment out if GTK not available on Windows)
-# weasyprint>=62.3
 
 # Dev
 python-dotenv>=1.0.1
