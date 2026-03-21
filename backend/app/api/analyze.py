@@ -19,7 +19,13 @@ async def analyze(
     try:
         result = await run_full_analysis(body.resume_text, body.jd_text)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Analysis failed: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Analysis error: {type(e).__name__} - {str(e)}"
+        )
 
     # Persist to MongoDB
     doc = {

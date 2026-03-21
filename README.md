@@ -1,4 +1,5 @@
 # AI Adaptive Onboarding Engine v3
+
 ### Production-Grade AI Platform — Full Architecture Guide
 
 ---
@@ -175,6 +176,7 @@ Tie-breaking by: gap_score × mention_count (highest priority first)
 ## 🍃 MongoDB Schema
 
 ### users
+
 ```json
 {
   "_id": "ObjectId",
@@ -188,6 +190,7 @@ Tie-breaking by: gap_score × mention_count (highest priority first)
 ```
 
 ### analyses
+
 ```json
 {
   "_id": "ObjectId",
@@ -210,6 +213,7 @@ Tie-breaking by: gap_score × mention_count (highest priority first)
 ```
 
 ### progress
+
 ```json
 {
   "_id": "ObjectId",
@@ -221,6 +225,7 @@ Tie-breaking by: gap_score × mention_count (highest priority first)
 ```
 
 ### chat_history
+
 ```json
 {
   "_id": "ObjectId",
@@ -237,16 +242,18 @@ Tie-breaking by: gap_score × mention_count (highest priority first)
 ## 🚀 Deployment Guide
 
 ### Step 1 — MongoDB Atlas
+
 1. Create free cluster at mongodb.com/atlas
 2. Create database user + password
 3. Whitelist IP `0.0.0.0/0` (or specific IPs)
 4. Copy connection string: `mongodb+srv://user:pass@cluster.mongodb.net/`
 
 ### Step 2 — Backend on Render
+
 1. Push code to GitHub
 2. Go to render.com → New Web Service
 3. Connect repo, set root directory to `backend/`
-4. Build command: `pip install -r requirements.txt && python -m spacy download en_core_web_sm`
+4. Build command: `pip install -r requirements.txt`
 5. Start command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
 6. Add environment variables:
    ```
@@ -260,6 +267,7 @@ Tie-breaking by: gap_score × mention_count (highest priority first)
    ```
 
 ### Step 3 — Frontend on Vercel
+
 1. Go to vercel.com → New Project
 2. Import GitHub repo, set root to `frontend/`
 3. Add environment variable:
@@ -269,7 +277,9 @@ Tie-breaking by: gap_score × mention_count (highest priority first)
 4. Deploy — Vercel auto-deploys on every push to main
 
 ### Step 4 — CI/CD (GitHub Actions)
+
 Add these secrets to your GitHub repo:
+
 ```
 GROQ_API_KEY
 ANTHROPIC_API_KEY
@@ -301,18 +311,21 @@ VERCEL_PROJECT_ID
 ## ⚡ Performance Optimization
 
 ### Backend
+
 - **Motor async driver**: non-blocking MongoDB I/O
 - **Parallel LLM calls**: asyncio.gather() for resume + JD extraction
 - **Model caching**: @lru_cache on spaCy and SentenceTransformer load
 - **Connection pooling**: Motor maxPoolSize=20
 
 ### Frontend
+
 - **TanStack Query**: 5min staleTime, automatic background refresh
 - **Skeleton loaders**: prevents layout shift during loading
 - **React Router**: code splitting per route (lazy load optional)
 - **Axios**: interceptors handle auth + errors globally
 
 ### Optional Redis Cache
+
 ```python
 # Cache analysis results for 1 hour
 import aioredis
@@ -353,7 +366,7 @@ ANTHROPIC_API_KEY=your_key
 JWT_SECRET=dev-secret-change-in-prod
 EOF
 
-uvicorn app.main:app --reload
+uvicorn app.main:app --reloaduvicorn app.main:app --reload
 
 # 4. Frontend (new terminal)
 cd frontend
@@ -363,6 +376,7 @@ npm start
 ```
 
 Or with Docker Compose:
+
 ```bash
 cp .env.example .env  # fill in API keys
 docker-compose up --build
@@ -382,23 +396,103 @@ cd frontend
 npm test
 ```
 
+## 🚨 Troubleshooting Auth Errors (409 Conflict, 401 Unauthorized)
+
+### Symptoms (matches your logs)
+
+```
+POST /api/auth/register → 409 Conflict (Email already registered)
+POST /api/auth/login → 401 Unauthorized (Invalid email or password)
+MongoDB: skillgap_v3 connected ✅
+```
+
+### Root Cause
+
+1. **409**: Email exists (unique index `users.email`)
+2. **401**: Password doesn't match bcrypt hash
+
+### Fix: Reset MongoDB Data (2 min)
+
+**Windows:**
+
+1. Open Services (`Win+R` → `services.msc`)
+2. Stop **MongoDB** service
+3. Delete `C:\data\db\*` (backup first if needed)
+4. Start **MongoDB** service
+5. Restart backend: `cd backend && uvicorn app.main:app --reload`
+6. Test register/login via curl:
+
+```bash
+# Register new user
+curl -X POST http://localhost:8000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","password":"testpass123","name":"Test User"}'
+
+# Login
+curl -X POST http://localhost:8000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","password":"testpass123"}'
+```
+
+**Expected response:**
+
+```json
+{
+  "access_token": "eyJ...",
+  "token_type": "bearer",
+  "user": { "id": "67...", "email": "test@example.com", "name": "Test User" }
+}
+```
+
+### Verify Backend Running
+
+```
+cd backend
+uvicorn app.main:app --reload --port 8000
+# Should log: "Connected to MongoDB: skillgap_v3"
+```
+
+### .env Setup (create if missing)
+
+```bash
+cd backend
+cat > .env << 'EOF'
+MONGO_URI=mongodb://localhost:27017
+MONGO_DB_NAME=skillgap_v3
+GROQ_API_KEY=your_groq_key_here
+ANTHROPIC_API_KEY=your_anthropic_key_here
+JWT_SECRET=change-me-super-secret-in-production
+EOF
+```
+
+### Frontend Test
+
+```bash
+cd frontend
+echo 'REACT_APP_API_URL=http://localhost:8000/api' > .env
+npm start
+```
+
+**If MongoDB not installed:** Download Community Edition from mongodb.com, install as service.
+
 ---
 
 ## 📊 New Features in v3
 
-| Feature | v2 | v3 |
-|---|---|---|
-| Skill extraction | LLM prompt only | spaCy NER + vocab + LLM |
-| Matching | String comparison | Sentence embeddings cosine sim |
-| Gap scoring | Hardcoded thresholds | Feature-engineered (level + freq + embedding) |
-| Learning path order | LLM decides | Topological sort + priority scoring |
-| Resume score | None | 0–100 with 4-dimension breakdown |
-| Database | users.json flat file | MongoDB Atlas (Motor async) |
-| Auth | Basic JWT | bcrypt + JWT + interceptors |
-| AI reliability | Single provider | Groq → Claude fallback + retry |
-| UI | Emoji-heavy tabs | Professional sidebar + cards |
-| State | useState | TanStack Query + Axios |
-| PDF export | None | WeasyPrint via /export endpoint |
-| CI/CD | None | GitHub Actions → Vercel + Render |
-| Docker | None | docker-compose.yml included |
+| Feature             | v2                   | v3                                            |
+| ------------------- | -------------------- | --------------------------------------------- |
+| Skill extraction    | LLM prompt only      | spaCy NER + vocab + LLM                       |
+| Matching            | String comparison    | Sentence embeddings cosine sim                |
+| Gap scoring         | Hardcoded thresholds | Feature-engineered (level + freq + embedding) |
+| Learning path order | LLM decides          | Topological sort + priority scoring           |
+| Resume score        | None                 | 0–100 with 4-dimension breakdown              |
+| Database            | users.json flat file | MongoDB Atlas (Motor async)                   |
+| Auth                | Basic JWT            | bcrypt + JWT + interceptors                   |
+| AI reliability      | Single provider      | Groq → Claude fallback + retry                |
+| UI                  | Emoji-heavy tabs     | Professional sidebar + cards                  |
+| State               | useState             | TanStack Query + Axios                        |
+| PDF export          | None                 | WeasyPrint via /export endpoint               |
+| CI/CD               | None                 | GitHub Actions → Vercel + Render              |
+| Docker              | None                 | docker-compose.yml included                   |
+
 # Skill-Gap
