@@ -17,7 +17,10 @@ def hash_password(password: str) -> str:
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return bcrypt.checkpw(plain.encode(), hashed.encode())
+    # Ensure hashed is bytes for bcrypt
+    if isinstance(hashed, str):
+        hashed = hashed.encode('utf-8')
+    return bcrypt.checkpw(plain.encode('utf-8'), hashed)
 
 
 # ── JWT tokens ───────────────────────────────────────────────────────────────
