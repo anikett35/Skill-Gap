@@ -12,7 +12,7 @@ import logging
 from app.core.config import settings
 from app.core.logging import setup_logging
 from app.db.mongodb import connect_to_mongo, close_mongo_connection
-from app.api import auth, analyze, progress, chat, export
+from app.api import auth, analyze, progress, chat, export, debug
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -75,6 +75,7 @@ app.include_router(analyze.router, prefix="/api/analyze", tags=["Analysis"])
 app.include_router(progress.router, prefix="/api/progress", tags=["Progress"])
 app.include_router(chat.router, prefix="/api/chat", tags=["AI Mentor"])
 app.include_router(export.router, prefix="/api/export", tags=["Export"])
+app.include_router(debug.router, prefix="/api/debug", tags=["Debug"])
 
 
 @app.get("/health")
