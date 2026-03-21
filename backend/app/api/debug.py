@@ -1,8 +1,6 @@
 """Debug endpoint to diagnose deployment issues."""
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from app.core.config import settings
-from app.db.mongodb import db
-import importlib
 
 router = APIRouter()
 
