@@ -6,9 +6,9 @@ from typing import List
 class Settings(BaseSettings):
     # App
     ENVIRONMENT: str = "development"
-    DEBUG: bool = True
+    DEBUG: bool = False
 
-    # MongoDB
+    # MongoDB (use env var if available, fallback to default)
     MONGO_URI: str = "mongodb+srv://aniketbedwal90_db_user:aniketbedwal90_db_user@cluster0.jw3kv6t.mongodb.net/skillgap_v3?retryWrites=true&w=majority"
     MONGO_DB_NAME: str = "skillgap_v3"
     PORT: int = 8000
@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     # CORS
     ALLOWED_ORIGINS: List[str] = [
         "http://localhost:3000",
+        "http://localhost:5173",
         "https://skill-gap-seven.vercel.app",
     ]
 

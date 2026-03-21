@@ -1,12 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException
 from datetime import datetime
 from bson import ObjectId
+import logging
 
 from app.schemas.schemas import AnalyzeRequest
 from app.services.analysis import run_full_analysis
 from app.core.security import get_current_user
 from app.db.mongodb import analyses_col
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -16,27 +18,35 @@ async def analyze(
     current_user: dict = Depends(get_current_user),
 ):
     """Run full ML + AI analysis pipeline on resume and job description."""
+    # Step 1: Run analysis (this should NOT fail)
     try:
         result = await run_full_analysis(body.resume_text, body.jd_text)
     except Exception as e:
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.error(f"Analysis failed: {str(e)}", exc_info=True)
+        logger.error(f"Analysis pipeline failed: {type(e).__name__}: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500, 
-            detail=f"Analysis error: {type(e).__name__} - {str(e)}"
+            detail=f"Analysis failed: {type(e).__name__} - {str(e)}"
         )
 
-    # Persist to MongoDB
-    doc = {
-        "user_id": current_user["user_id"],
-        "resume_text": body.resume_text[:5000],  # truncate for storage
-        "jd_text": body.jd_text[:3000],
-        "result": result,
-        "created_at": datetime.utcnow(),
-    }
-    inserted = await analyses_col().insert_one(doc)
-    result["id"] = str(inserted.inserted_id)
+    # Step 2: Try to persist to MongoDB (should NOT fail the response if it fails)
+    analysis_id = None
+    try:
+        doc = {
+            "user_id": current_user["user_id"],
+            "resume_text": body.resume_text[:5000],
+            "jd_text": body.jd_text[:3000],
+            "result": result,
+            "created_at": datetime.utcnow(),
+        }
+        inserted = await analyses_col().insert_one(doc)
+        analysis_id = str(inserted.inserted_id)
+        result["id"] = analysis_id
+        logger.info(f"Analysis saved to MongoDB: {analysis_id}")
+    except Exception as e:
+        logger.warning(f"Failed to save analysis to MongoDB: {type(e).__name__}: {str(e)}")
+        # Still return the analysis result even if storage failed
+        result["id"] = "temp_" + datetime.utcnow().isoformat()
+        result["storage_warning"] = "Analysis completed but could not be saved to database"
 
     return result
 
