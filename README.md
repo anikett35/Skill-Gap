@@ -366,7 +366,7 @@ ANTHROPIC_API_KEY=your_key
 JWT_SECRET=dev-secret-change-in-prod
 EOF
 
-uvicorn app.main:app --reloaduvicorn app.main:app --reload
+uvicorn app.main:app --reload uvicorn app.main:app --reload
 
 # 4. Frontend (new terminal)
 cd frontend

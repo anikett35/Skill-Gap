@@ -27,6 +27,8 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       JWT_SECRET: ${JWT_SECRET}
       ENVIRONMENT: production
+      # Fix: comma-separated for pydantic-settings List[str]
+      ALLOWED_ORIGINS: "http://localhost:3000,http://localhost:5173,https://skill-gap-seven.vercel.app,https://skill-gap-mtzv.onrender.com"
     depends_on:
       - mongo
     volumes:
@@ -41,7 +43,8 @@ services:
     ports:
       - "3000:80"
     environment:
-      REACT_APP_API_URL: http://localhost:8000/api
+      # Fix: Vite requires VITE_ prefix; this is baked at build time via ARG
+      VITE_API_URL: http://localhost:8000/api
     depends_on:
       - backend
 
